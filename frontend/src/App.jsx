@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 // Temporary Login Component
-const LoginPage = () => {
+const LoginPage = ({ onLogin }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -10,7 +10,7 @@ const LoginPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Login attempt:', formData);
-    // Here you would call your auth API
+    onLogin(); // Call the login function
   };
 
   const handleChange = (e) => {
@@ -23,8 +23,8 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-800 via-stone-700 to-amber-900 flex items-center justify-center p-4">
-      {/* Background decoration */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http://www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.1%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20" />
+      {/* Background decoration - FIXED */}
+      <div className="absolute inset-0 bg-gradient-to-br from-black/5 to-transparent opacity-20" />
       
       <div className="w-full max-w-md relative z-10">
         {/* Header */}
@@ -41,7 +41,7 @@ const LoginPage = () => {
         <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 rounded-lg shadow-xl backdrop-blur-sm relative overflow-hidden p-8">
           <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
           <div className="relative">
-            <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {/* Username Field */}
               <div className="space-y-1">
                 <label className="block text-sm font-semibold text-stone-700">
@@ -77,7 +77,7 @@ const LoginPage = () => {
 
               {/* Submit Button */}
               <button
-                onClick={handleSubmit}
+                type="submit"
                 className="relative inline-flex items-center justify-center font-semibold transition-all duration-200
                   px-6 py-2.5 text-base rounded-md bg-gradient-to-b from-amber-400 to-amber-600 
                   border-2 border-amber-700 text-amber-900 hover:from-amber-300 hover:to-amber-500
@@ -95,7 +95,7 @@ const LoginPage = () => {
                   </span>
                 </p>
               </div>
-            </div>
+            </form>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ const LoginPage = () => {
 };
 
 // Temporary Dashboard Component
-const Dashboard = () => {
+const Dashboard = ({ onLogout }) => {
   // Mock characters data
   const characters = [
     {
@@ -134,6 +134,16 @@ const Dashboard = () => {
       max_hit_points: 68,
       armor_class: 17,
     },
+    {
+      id: 3,
+      name: 'Gimli, Filho de Glóin',
+      class_name: 'Fighter',
+      race_name: 'Dwarf',
+      level: 9,
+      hit_points: 78,
+      max_hit_points: 85,
+      armor_class: 19,
+    }
   ];
 
   const getHealthColor = (current, max) => {
@@ -153,13 +163,22 @@ const Dashboard = () => {
               ⚔️ FORGE OF HEROES
             </h1>
             <div className="flex items-center space-x-4">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 
-                flex items-center justify-center border-2 border-amber-700 shadow-lg">
-                <span className="text-amber-900 font-bold text-sm">AG</span>
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 
+                  flex items-center justify-center border-2 border-amber-700 shadow-lg">
+                  <span className="text-amber-900 font-bold text-sm">AG</span>
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-stone-100 font-semibold">Aventureiro Lendário</p>
+                  <p className="text-stone-400 text-sm">Mestre dos Heróis</p>
+                </div>
               </div>
-              <button className="px-4 py-2 bg-gradient-to-b from-stone-600 to-stone-800 
+              <button 
+                onClick={onLogout}
+                className="px-4 py-2 bg-gradient-to-b from-stone-600 to-stone-800 
                 border-2 border-stone-900 text-stone-100 rounded-md hover:from-stone-500 hover:to-stone-700
-                transition-all duration-200">
+                transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+              >
                 Sair
               </button>
             </div>
@@ -182,8 +201,9 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
-            rounded-lg shadow-xl p-6">
-            <div className="flex items-center">
+            rounded-lg shadow-xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+            <div className="relative flex items-center">
               <div className="text-3xl mr-4">⚔️</div>
               <div>
                 <p className="text-2xl font-bold text-stone-800">{characters.length}</p>
@@ -193,8 +213,9 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
-            rounded-lg shadow-xl p-6">
-            <div className="flex items-center">
+            rounded-lg shadow-xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+            <div className="relative flex items-center">
               <div className="text-3xl mr-4">🏆</div>
               <div>
                 <p className="text-2xl font-bold text-stone-800">
@@ -206,8 +227,9 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
-            rounded-lg shadow-xl p-6">
-            <div className="flex items-center">
+            rounded-lg shadow-xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+            <div className="relative flex items-center">
               <div className="text-3xl mr-4">🛡️</div>
               <div>
                 <p className="text-2xl font-bold text-stone-800">
@@ -233,52 +255,92 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {characters.map(character => (
               <div key={character.id} className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
-                rounded-lg shadow-xl p-6 hover:shadow-2xl transition-shadow cursor-pointer">
-                {/* Character Header */}
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="text-lg font-bold text-stone-800">{character.name}</h4>
-                    <p className="text-stone-600">
-                      {character.race_name} {character.class_name} • Nível {character.level}
-                    </p>
+                rounded-lg shadow-xl p-6 hover:shadow-2xl transition-shadow cursor-pointer relative overflow-hidden">
+                <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+                <div className="relative">
+                  {/* Character Header */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-stone-800">{character.name}</h4>
+                      <p className="text-stone-600">
+                        {character.race_name} {character.class_name} • Nível {character.level}
+                      </p>
+                    </div>
+                    <div className="text-2xl">
+                      {character.class_name === 'Wizard' && '🧙‍♂️'}
+                      {character.class_name === 'Ranger' && '🏹'}
+                      {character.class_name === 'Fighter' && '⚔️'}
+                    </div>
                   </div>
-                  <div className="text-2xl">
-                    {character.class_name === 'Wizard' && '🧙‍♂️'}
-                    {character.class_name === 'Ranger' && '🏹'}
-                  </div>
-                </div>
 
-                {/* Health Bar */}
-                <div className="mb-3">
-                  <div className="flex justify-between text-sm text-stone-600 mb-1">
-                    <span>Vida</span>
-                    <span>{character.hit_points}/{character.max_hit_points}</span>
+                  {/* Health Bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-sm text-stone-600 mb-1">
+                      <span>Vida</span>
+                      <span>{character.hit_points}/{character.max_hit_points}</span>
+                    </div>
+                    <div className="w-full bg-stone-300 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all ${getHealthColor(character.hit_points, character.max_hit_points)}`}
+                        style={{ width: `${(character.hit_points / character.max_hit_points) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-stone-300 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all ${getHealthColor(character.hit_points, character.max_hit_points)}`}
-                      style={{ width: `${(character.hit_points / character.max_hit_points) * 100}%` }}
-                    />
+
+                  {/* Stats */}
+                  <div className="flex justify-between text-sm text-stone-600 mb-3">
+                    <span>CA: {character.armor_class}</span>
+                    <span>Criado hoje</span>
                   </div>
-                </div>
 
-                {/* Stats */}
-                <div className="flex justify-between text-sm text-stone-600 mb-3">
-                  <span>CA: {character.armor_class}</span>
-                  <span>Criado hoje</span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex space-x-2">
-                  <button className="flex-1 px-3 py-1 bg-amber-100 text-amber-700 rounded text-sm font-medium hover:bg-amber-200 transition-colors">
-                    Editar
-                  </button>
-                  <button className="flex-1 px-3 py-1 bg-stone-200 text-stone-700 rounded text-sm font-medium hover:bg-stone-300 transition-colors">
-                    Ficha
-                  </button>
+                  {/* Actions */}
+                  <div className="flex space-x-2">
+                    <button className="flex-1 px-3 py-1 bg-amber-100 text-amber-700 rounded text-sm font-medium hover:bg-amber-200 transition-colors">
+                      Editar
+                    </button>
+                    <button className="flex-1 px-3 py-1 bg-stone-200 text-stone-700 rounded text-sm font-medium hover:bg-stone-300 transition-colors">
+                      Ficha
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
+            rounded-lg shadow-xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+            <div className="relative">
+              <h4 className="text-lg font-bold text-stone-800 mb-4">🎲 Ações Rápidas</h4>
+              <div className="space-y-3">
+                <button className="w-full text-left p-3 rounded-md bg-stone-100 hover:bg-stone-200 transition-colors">
+                  <span className="font-medium">Rolar Dados</span>
+                  <p className="text-sm text-stone-600">Ferramenta de dados para suas aventuras</p>
+                </button>
+                <button className="w-full text-left p-3 rounded-md bg-stone-100 hover:bg-stone-200 transition-colors">
+                  <span className="font-medium">Buscar Feitiços</span>
+                  <p className="text-sm text-stone-600">Explore a biblioteca de magias</p>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-stone-50 to-stone-100 border-2 border-stone-300 
+            rounded-lg shadow-xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 border-2 border-amber-200 rounded-lg opacity-30" />
+            <div className="relative">
+              <h4 className="text-lg font-bold text-stone-800 mb-4">🏰 Campanhas</h4>
+              <div className="text-center py-4">
+                <p className="text-stone-600 mb-4">Sistema de campanhas em breve!</p>
+                <button className="px-4 py-2 bg-gradient-to-b from-stone-400 to-stone-600 
+                  border-2 border-stone-700 text-stone-100 rounded-md opacity-50 cursor-not-allowed">
+                  Em Desenvolvimento
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -347,8 +409,8 @@ export default function App() {
       </div>
 
       {/* Render current view */}
-      {currentView === 'login' && <LoginPage />}
-      {currentView === 'dashboard' && <Dashboard />}
+      {currentView === 'login' && <LoginPage onLogin={handleLogin} />}
+      {currentView === 'dashboard' && <Dashboard onLogout={handleLogout} />}
     </div>
   );
 }
