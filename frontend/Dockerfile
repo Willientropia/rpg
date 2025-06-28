@@ -2,15 +2,17 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Expose port
-EXPOSE 3000
+EXPOSE 5173
 
-# Start development server
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start dev server with correct host binding
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
