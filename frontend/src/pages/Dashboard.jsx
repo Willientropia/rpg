@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
-import { charactersService } from '../services/charactersService';
+import { charactersService } from '../services/charactersService'
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
