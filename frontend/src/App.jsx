@@ -1,4 +1,4 @@
-// src/App.jsx - Estrutura principal CORRIGIDA
+// src/App.jsx - Estrutura principal ATUALIZADA com SpellManagement
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import CharacterCreate from './pages/characters/CharacterCreate';
 import CharacterDetail from './pages/characters/CharacterDetail';
 import CharacterEdit from './pages/characters/CharacterEdit';
 import CharacterSheet from './pages/characters/CharacterSheet';
+import SpellManagement from './pages/characters/SpellManagement';
 
 // Componentes de proteção
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -78,6 +79,9 @@ function App() {
             <Route path="characters/:id" element={<CharacterDetail />} />
             <Route path="characters/:id/edit" element={<CharacterEdit />} />
             <Route path="characters/:id/sheet" element={<CharacterSheet />} />
+            
+            {/* NOVA ROTA: Sistema de Feitiços */}
+            <Route path="characters/:id/spells" element={<SpellManagement />} />
             
             {/* Redirect dashboard para / */}
             <Route path="dashboard" element={<Navigate to="/" replace />} />
