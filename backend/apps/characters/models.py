@@ -432,6 +432,77 @@ class Character(models.Model):
     # SISTEMA DE PROGRESSÃO
     # ========================================
     
+  
+
+    
+
+    
+    # ========================================
+    # MÉTODOS DE INICIALIZAÇÃO
+    # ========================================
+    
+    def save(self, *args, **kwargs):
+        """Override save para calcular HP inicial e spell slots"""
+        # Primeira vez sendo salvo
+        if not self.pk:
+            if not self.max_hp:
+                self.max_hp = self.calculate_max_hp()
+                self.current_hp = self.max_hp
+            
+            # Inicializa spell slots se for spellcaster
+            if self.character_class.is_spellcaster:
+                self._initialize_spell_slots()
+        
+        super().save(*args, **kwargs)
+
+    def _initialize_spell_slots(self):
+        """Inicializa spell slots baseado na classe e nível"""
+        try:
+            progression = ClassLevelProgression.objects.get(
+                character_class=self.character_class,
+                level=self.level
+            )
+            
+            # Para Warlock, só tem slots de um nível específico
+            for spell_level in range(1, 10):
+                max_slots = getattr(progression, f'spell_slots_{spell_level}', 0)
+                if max_slots > 0:
+                    setattr(self, f'current_spell_slots_{spell_level}', max_slots)
+                else:
+                    setattr(self, f'current_spell_slots_{spell_level}', 0)
+                    
+        except ClassLevelProgression.DoesNotExist:
+            # Se não há progressão definida, zerar todos os slots
+            for spell_level in range(1, 10):
+                setattr(self, f'current_spell_slots_{spell_level}', 0)
+
+    def rest_short(self):
+        """Descanso curto - Warlock recupera TODOS os spell slots"""
+        if self.character_class.spell_slots_type == 'warlock':
+            # Warlock recupera TODOS os spell slots em descanso curto
+            for spell_level in range(1, 10):
+                max_slots = self.get_max_spell_slots(spell_level)
+                setattr(self, f'current_spell_slots_{spell_level}', max_slots)
+            
+            self.save()
+            return True
+        
+        # Outras classes podem ter mecânicas específicas aqui
+        self.save()
+        return False
+
+    def rest_long(self):
+        """Descanso longo - restaura HP e spell slots"""
+        self.current_hp = self.max_hp
+        self.temporary_hp = 0
+        
+        # Restaura todos os spell slots
+        for spell_level in range(1, 10):
+            max_slots = self.get_max_spell_slots(spell_level)
+            setattr(self, f'current_spell_slots_{spell_level}', max_slots)
+        
+        self.save()
+
     def level_up(self):
         """Sobe um nível e atualiza todas as estatísticas"""
         if self.level >= 20:
@@ -450,10 +521,8 @@ class Character(models.Model):
         hp_gained = self.max_hp - old_max_hp
         self.current_hp += hp_gained
         
-        # Restaura spell slots para o novo nível
-        for spell_level in range(1, 10):
-            max_slots = self.get_max_spell_slots(spell_level)
-            setattr(self, f'current_spell_slots_{spell_level}', max_slots)
+        # Atualiza spell slots para o novo nível
+        self._initialize_spell_slots()
         
         self.save()
         
@@ -464,51 +533,6 @@ class Character(models.Model):
                     delattr(self, f'_{attr}')
         
         return True
-    
-    def rest_long(self):
-        """Descanso longo - restaura HP e spell slots"""
-        self.current_hp = self.max_hp
-        self.temporary_hp = 0
-        
-        # Restaura todos os spell slots
-        for spell_level in range(1, 10):
-            max_slots = self.get_max_spell_slots(spell_level)
-            setattr(self, f'current_spell_slots_{spell_level}', max_slots)
-        
-        self.save()
-    
-    def rest_short(self):
-        """Descanso curto - algumas classes podem recuperar recursos"""
-        # Por enquanto, apenas algumas classes específicas se beneficiam
-        # Warlock recupera spell slots, por exemplo
-        if self.character_class.spell_slots_type == 'warlock':
-            for spell_level in range(1, 6):  # Warlock slots até 5º nível
-                max_slots = self.get_max_spell_slots(spell_level)
-                if max_slots > 0:
-                    setattr(self, f'current_spell_slots_{spell_level}', max_slots)
-        
-        self.save()
-    
-    # ========================================
-    # MÉTODOS DE INICIALIZAÇÃO
-    # ========================================
-    
-    def save(self, *args, **kwargs):
-        """Override save para calcular HP inicial e spell slots"""
-        # Primeira vez sendo salvo
-        if not self.pk:
-            if not self.max_hp:
-                self.max_hp = self.calculate_max_hp()
-                self.current_hp = self.max_hp
-            
-            # Inicializa spell slots se for spellcaster
-            if self.character_class.is_spellcaster:
-                for spell_level in range(1, 10):
-                    max_slots = self.get_max_spell_slots(spell_level)
-                    setattr(self, f'current_spell_slots_{spell_level}', max_slots)
-        
-        super().save(*args, **kwargs)
-
 
 class CharacterSpell(models.Model):
     """

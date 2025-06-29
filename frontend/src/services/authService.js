@@ -1,11 +1,15 @@
-// src/services/authService.js - Serviço de autenticação
+// src/services/authService.js - Serviço de autenticação COM DEBUG
 import api from './api';
 
 export const authService = {
   // Login
   async login(credentials) {
     try {
+      console.log('🔐 AuthService.login chamado com:', credentials);
+      console.log('🌐 URL da API:', api.defaults.baseURL);
+      
       const response = await api.post('/auth/login/', credentials);
+      console.log('📨 Resposta do login:', response.data);
       
       // A resposta do Django vem em formato diferente
       const data = response.data;
@@ -15,6 +19,9 @@ export const authService = {
         const access = data.access;
         const refresh = data.refresh;
         const user = data.user;
+
+        console.log('✅ Tokens extraídos:', { access: !!access, refresh: !!refresh });
+        console.log('👤 Usuário extraído:', user);
 
         // Salvar tokens e user no localStorage
         localStorage.setItem('access_token', access);
@@ -29,13 +36,23 @@ export const authService = {
         };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
+      console.error('📨 Response data:', error.response?.data);
+      console.error('🔢 Status:', error.response?.status);
+      console.error('📍 URL:', error.config?.url);
       
       // Tratar diferentes tipos de erro
       if (error.response?.status === 401) {
         return {
           success: false,
           error: 'Usuário ou senha incorretos',
+        };
+      }
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'Serviço de autenticação não encontrado. Verifique se o backend está rodando.',
         };
       }
       
@@ -48,7 +65,7 @@ export const authService = {
 
       return {
         success: false,
-        error: error.response?.data?.message || 'Erro ao conectar com o servidor',
+        error: error.response?.data?.message || error.message || 'Erro ao conectar com o servidor',
       };
     }
   },
@@ -56,11 +73,17 @@ export const authService = {
   // Register
   async register(userData) {
     try {
+      console.log('📝 AuthService.register chamado com:', userData);
+      
       const response = await api.post('/auth/register/', userData);
+      console.log('📨 Resposta do registro:', response.data);
+      
       const data = response.data;
 
       if (data.success !== false) {
         // Se o registro for bem-sucedido, fazer login automático
+        console.log('✅ Registro bem-sucedido, fazendo login automático...');
+        
         const loginResult = await this.login({
           username: userData.username,
           password: userData.password,
@@ -74,7 +97,8 @@ export const authService = {
         };
       }
     } catch (error) {
-      console.error('Register error:', error);
+      console.error('❌ Register error:', error);
+      console.error('📨 Response data:', error.response?.data);
       
       // Tratar erros de validação do Django
       if (error.response?.data?.errors) {
@@ -86,13 +110,14 @@ export const authService = {
 
       return {
         success: false,
-        error: error.response?.data?.message || 'Erro ao conectar com o servidor',
+        error: error.response?.data?.message || error.message || 'Erro ao conectar com o servidor',
       };
     }
   },
 
   // Logout
   logout() {
+    console.log('🚪 AuthService.logout chamado');
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
@@ -102,9 +127,11 @@ export const authService = {
   getCurrentUser() {
     try {
       const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
+      const user = userStr ? JSON.parse(userStr) : null;
+      console.log('👤 getCurrentUser retornando:', user);
+      return user;
     } catch (error) {
-      console.error('Error parsing user from localStorage:', error);
+      console.error('❌ Error parsing user from localStorage:', error);
       return null;
     }
   },
@@ -113,15 +140,27 @@ export const authService = {
   isAuthenticated() {
     const token = localStorage.getItem('access_token');
     
-    if (!token) return false;
+    if (!token) {
+      console.log('🔐 isAuthenticated: sem token');
+      return false;
+    }
     
     // Verificar se o token não está expirado
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Date.now() / 1000;
-      return payload.exp > currentTime;
+      const isValid = payload.exp > currentTime;
+      
+      console.log('🔐 isAuthenticated:', {
+        hasToken: !!token,
+        exp: payload.exp,
+        now: currentTime,
+        isValid
+      });
+      
+      return isValid;
     } catch (error) {
-      // Se não conseguir decodificar, considerar inválido
+      console.log('❌ Erro ao decodificar token:', error);
       return false;
     }
   },
@@ -187,6 +226,8 @@ export const authService = {
   // Refresh token
   async refreshToken() {
     try {
+      console.log('🔄 Tentando refresh token...');
+      
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {
         throw new Error('No refresh token available');
@@ -198,9 +239,12 @@ export const authService = {
 
       const { access } = response.data;
       localStorage.setItem('access_token', access);
+      
+      console.log('✅ Token refreshed com sucesso');
 
       return { success: true, data: { access } };
     } catch (error) {
+      console.log('❌ Refresh failed:', error);
       // Clear tokens on refresh failure
       this.logout();
       return {

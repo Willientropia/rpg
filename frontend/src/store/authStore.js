@@ -1,4 +1,4 @@
-// src/store/authStore.js - Zustand Store para Autenticação
+// src/store/authStore.js - Zustand Store REAL para Autenticação
 import { create } from 'zustand';
 import { authService } from '../services/authService';
 
@@ -10,21 +10,51 @@ export const useAuthStore = create((set, get) => ({
   error: null,
 
   // Inicializar estado do localStorage
-  initialize: () => {
+  initialize: async () => {
     set({ isLoading: true });
     
     try {
+      console.log('🔄 Inicializando autenticação...');
+      
       const user = authService.getCurrentUser();
       const isAuthenticated = authService.isAuthenticated();
       
-      set({
-        user,
-        isAuthenticated,
-        isLoading: false,
-        error: null,
-      });
+      console.log('👤 Usuário no localStorage:', user);
+      console.log('🔐 Está autenticado:', isAuthenticated);
+      
+      // Se tem usuário mas token inválido, tentar refresh
+      if (user && !isAuthenticated) {
+        console.log('🔄 Token inválido, tentando refresh...');
+        const refreshResult = await authService.refreshToken();
+        
+        if (refreshResult.success) {
+          console.log('✅ Token refreshed com sucesso');
+          set({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          });
+        } else {
+          console.log('❌ Refresh falhou, limpando dados');
+          authService.logout();
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+          });
+        }
+      } else {
+        set({
+          user,
+          isAuthenticated,
+          isLoading: false,
+          error: null,
+        });
+      }
     } catch (error) {
-      console.error('Erro ao inicializar auth:', error);
+      console.error('❌ Erro ao inicializar auth:', error);
       set({
         user: null,
         isAuthenticated: false,
@@ -39,9 +69,13 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
+      console.log('🔐 Tentando login...', credentials.username);
+      
       const result = await authService.login(credentials);
       
       if (result.success) {
+        console.log('✅ Login bem-sucedido:', result.data.user);
+        
         set({
           user: result.data.user,
           isAuthenticated: true,
@@ -50,6 +84,8 @@ export const useAuthStore = create((set, get) => ({
         });
         return { success: true };
       } else {
+        console.log('❌ Login falhou:', result.error);
+        
         set({
           isLoading: false,
           error: result.error,
@@ -57,6 +93,7 @@ export const useAuthStore = create((set, get) => ({
         return { success: false, error: result.error };
       }
     } catch (error) {
+      console.error('❌ Erro no login:', error);
       const errorMessage = error.response?.data?.message || 'Erro ao fazer login';
       set({
         isLoading: false,
@@ -71,9 +108,13 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
+      console.log('📝 Tentando registro...', userData.username);
+      
       const result = await authService.register(userData);
       
       if (result.success) {
+        console.log('✅ Registro bem-sucedido:', result.data.user);
+        
         set({
           user: result.data.user,
           isAuthenticated: true,
@@ -82,6 +123,8 @@ export const useAuthStore = create((set, get) => ({
         });
         return { success: true };
       } else {
+        console.log('❌ Registro falhou:', result.error);
+        
         set({
           isLoading: false,
           error: result.error,
@@ -89,6 +132,7 @@ export const useAuthStore = create((set, get) => ({
         return { success: false, error: result.error };
       }
     } catch (error) {
+      console.error('❌ Erro no registro:', error);
       const errorMessage = error.response?.data?.message || 'Erro ao criar conta';
       set({
         isLoading: false,
@@ -100,6 +144,7 @@ export const useAuthStore = create((set, get) => ({
 
   // Logout
   logout: () => {
+    console.log('🚪 Fazendo logout...');
     authService.logout();
     set({
       user: null,

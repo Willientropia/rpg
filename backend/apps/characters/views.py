@@ -106,6 +106,45 @@ class CharacterClassViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': f'Progressão para nível {level} não encontrada'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+
+    @action(detail=True, methods=['post'])
+    def use_spell_slot(self, request, pk=None):
+        """Usa um spell slot do personagem"""
+        character = self.get_object()
+        
+        if not character.character_class.is_spellcaster:
+            return Response({
+                'success': False,
+                'error': 'Este personagem não é spellcaster'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = UseSpellSlotSerializer(
+            data=request.data,
+            context={'character': character}
+        )
+        
+        if serializer.is_valid():
+            spell_level = serializer.validated_data['spell_level']
+            success = character.use_spell_slot(spell_level)
+            
+            if success:
+                current_slots = character.get_current_spell_slots(spell_level)
+                max_slots = character.get_max_spell_slots(spell_level)
+                
+                char_serializer = CharacterDetailSerializer(character)
+                return Response({
+                    'success': True,
+                    'message': f'Espaço de magia nível {spell_level} usado. Restam: {current_slots}/{max_slots}',
+                    'character': char_serializer.data
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Não foi possível usar o espaço de magia'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BackgroundViewSet(viewsets.ReadOnlyModelViewSet):

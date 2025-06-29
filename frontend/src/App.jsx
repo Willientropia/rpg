@@ -1,4 +1,4 @@
-// src/App.jsx - Estrutura principal com roteamento
+// src/App.jsx - Estrutura principal CORRIGIDA
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import CharacterSheet from './pages/characters/CharacterSheet';
 
 // Componentes de proteção
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { AuthGuard } from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
@@ -37,21 +38,30 @@ function App() {
 
   // Inicializar autenticação ao carregar o app
   useEffect(() => {
+    console.log('🚀 App iniciando, inicializando auth...');
     initialize();
   }, [initialize]);
 
   // Mostrar loading enquanto inicializa
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner message="Inicializando aplicação..." />;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <div className="App">
         <Routes>
-          {/* Rotas públicas */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          {/* Rotas públicas com AuthGuard para redirecionar se já autenticado */}
+          <Route path="/login" element={
+            <AuthGuard requireAuth={false}>
+              <LoginPage />
+            </AuthGuard>
+          } />
+          <Route path="/register" element={
+            <AuthGuard requireAuth={false}>
+              <RegisterPage />
+            </AuthGuard>
+          } />
 
           {/* Rotas protegidas */}
           <Route path="/" element={
@@ -73,7 +83,7 @@ function App() {
             <Route path="dashboard" element={<Navigate to="/" replace />} />
           </Route>
 
-          {/* Rota 404 */}
+          {/* Rota 404 - redireciona para home se autenticado, senão para login */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

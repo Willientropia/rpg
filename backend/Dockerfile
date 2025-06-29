@@ -14,8 +14,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
+# Run migrations and create superuser script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Run server
+# Use entrypoint script
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# Default command
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

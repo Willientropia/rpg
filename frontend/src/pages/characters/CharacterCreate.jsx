@@ -1,7 +1,7 @@
-// src/pages/characters/CharacterCreate.jsx - Página de criação de personagem
+// src/pages/characters/CharacterCreate.jsx - CORRIGIDO
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersService, gameDataService } from '../../services/charactersService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -51,6 +51,7 @@ const SelectOption = ({
 
 export default function CharacterCreate() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   // Estados do formulário
   const [currentStep, setCurrentStep] = useState(1);
@@ -84,14 +85,30 @@ export default function CharacterCreate() {
     queryFn: gameDataService.getBackgrounds,
   });
 
-  // Mutation para criar personagem
+  // Mutation para criar personagem - CORRIGIDA
   const createCharacterMutation = useMutation({
     mutationFn: charactersService.createCharacter,
     onSuccess: (result) => {
-      if (result.success) {
-        navigate(`/characters/${result.data.id}`);
+      console.log('✅ Personagem criado com sucesso:', result);
+      
+      if (result.success && result.data) {
+        // Invalidar cache de personagens para atualizar listas
+        queryClient.invalidateQueries(['characters']);
+        
+        // Navegar para o personagem criado usando o ID correto
+        const characterId = result.data.id;
+        console.log('📍 Navegando para personagem ID:', characterId);
+        
+        navigate(`/characters/${characterId}`);
+      } else {
+        console.error('❌ Resposta inesperada do servidor:', result);
+        setFormErrors({ submit: 'Erro inesperado ao criar personagem' });
       }
     },
+    onError: (error) => {
+      console.error('❌ Erro na mutation:', error);
+      setFormErrors({ submit: error.message || 'Erro ao criar personagem' });
+    }
   });
 
   // Point Buy System
@@ -116,8 +133,10 @@ export default function CharacterCreate() {
     const newFormData = { ...formData, [ability]: newValue };
     
     // Verificar se não excede os pontos
-    const newPointsUsed = Object.keys(pointBuyTable).reduce((total, abilityName) => {
-      const key = `base_${abilityName.toLowerCase()}`;
+    const abilities = ['base_strength', 'base_dexterity', 'base_constitution', 
+                      'base_intelligence', 'base_wisdom', 'base_charisma'];
+    const newPointsUsed = abilities.reduce((total, abilityName) => {
+      const key = abilityName;
       if (key === ability) {
         return total + (pointBuyTable[newValue] || 0);
       }
@@ -187,11 +206,14 @@ export default function CharacterCreate() {
     setCurrentStep(prev => Math.max(1, prev - 1));
   };
 
-  // Submit final
+  // Submit final - CORRIGIDO
   const handleSubmit = async () => {
     if (!validateStep(5)) return;
 
-    const result = await createCharacterMutation.mutateAsync({
+    console.log('🚀 Iniciando criação de personagem...', formData);
+
+    // Preparar dados para envio
+    const characterData = {
       name: formData.name,
       race: formData.race.id,
       character_class: formData.character_class.id,
@@ -202,10 +224,15 @@ export default function CharacterCreate() {
       base_intelligence: formData.base_intelligence,
       base_wisdom: formData.base_wisdom,
       base_charisma: formData.base_charisma,
-    });
+    };
 
-    if (!result.success) {
-      setFormErrors({ submit: result.error });
+    console.log('📦 Dados sendo enviados:', characterData);
+
+    try {
+      await createCharacterMutation.mutateAsync(characterData);
+    } catch (error) {
+      console.error('❌ Erro no submit:', error);
+      setFormErrors({ submit: error.message || 'Erro ao criar personagem' });
     }
   };
 
