@@ -1,4 +1,8 @@
-export const Alert = ({ children, variant = 'info', className }) => {
+// src/components/ui/Alert.jsx
+import React from 'react';
+import { cn } from '../../utils/cn';
+
+const Alert = ({ children, variant = 'info', className }) => {
   const variants = {
     info: 'bg-blue-50 border-blue-200 text-blue-800',
     success: 'bg-green-50 border-green-200 text-green-800',
@@ -8,7 +12,7 @@ export const Alert = ({ children, variant = 'info', className }) => {
 
   return (
     <div className={cn(
-      'p-4 rounded-md border-2 font-medieval',
+      'p-4 rounded-md border-2',
       variants[variant],
       className
     )}>
@@ -17,4 +21,4 @@ export const Alert = ({ children, variant = 'info', className }) => {
   );
 };
 
-export { Button };
+export { Alert };

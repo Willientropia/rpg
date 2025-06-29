@@ -1,4 +1,8 @@
-export const Card = ({ children, className, ...props }) => {
+// src/components/ui/Card.jsx
+import React from 'react';
+import { cn } from '../../utils/cn';
+
+const Card = ({ children, className, ...props }) => {
   return (
     <div
       className={cn(
@@ -15,3 +19,5 @@ export const Card = ({ children, className, ...props }) => {
     </div>
   );
 };
+
+export { Card };  

@@ -1,3 +1,4 @@
+// src/components/ui/Button.jsx
 import React from 'react';
 import { cn } from '../../utils/cn';
 
@@ -14,7 +15,7 @@ const Button = React.forwardRef(({
     relative inline-flex items-center justify-center font-semibold transition-all duration-200
     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400
     disabled:opacity-50 disabled:cursor-not-allowed
-    border-2 font-medieval
+    border-2
   `;
 
   const variants = {
@@ -85,3 +86,5 @@ const Button = React.forwardRef(({
 });
 
 Button.displayName = 'Button';
+
+export { Button };

@@ -1,5 +1,6 @@
 // src/utils/cn.js
 // Utility function to combine classes (similar to clsx/classnames)
+// src/utils/cn.js - Utility function para combinar classes CSS
 export function cn(...classes) {
   return classes
     .filter(Boolean)
