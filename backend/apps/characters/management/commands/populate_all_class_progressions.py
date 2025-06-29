@@ -1,820 +1,397 @@
-# apps/characters/management/commands/populate_all_class_progressions.py
-# COMANDO COMPLETO PARA POPULAR TODAS AS PROGRESSÕES DE CLASSES
-
 from django.core.management.base import BaseCommand
-from apps.characters.models import CharacterClass, ClassLevelProgression
+from django.db import transaction
+from apps.characters.models import CharacterClass, ClassProgression
 
 
 class Command(BaseCommand):
-    help = 'Popula spell slots e progressão para todas as classes do D&D 5e'
+    """
+    Este comando popula o banco de dados com as progressões de nível para todas as
+    classes padrão de Dungeons & Dragons 5ª Edição.
+    """
+    help = 'Popula progressões para todas as classes de D&D 5e'
 
+    def add_arguments(self, parser):
+        """
+        Adiciona um argumento opcional para sobrescrever os dados existentes.
+        """
+        parser.add_argument(
+            '--overwrite',
+            action='store_true',
+            help='Sobrescreve as progressões de classe existentes no banco de dados.',
+        )
+
+    @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write('🎯 Populando progressões de todas as classes...')
-        
-        # Warlock (Pact Magic)
-        self.populate_warlock()
-        
-        # Full Casters
-        self.populate_wizard()
-        self.populate_sorcerer()
-        self.populate_bard()
-        self.populate_cleric()
-        self.populate_druid()
-        
-        # Half Casters
-        self.populate_paladin()
-        self.populate_ranger()
-        
-        # Third Casters
-        self.populate_eldritch_knight()
-        self.populate_arcane_trickster()
-        
-        # Non-casters
-        self.populate_non_casters()
-        
-        self.stdout.write(self.style.SUCCESS('✅ Todas as progressões populadas!'))
+        """
+        Lógica principal do comando. Itera sobre cada classe e popula sua progressão.
+        """
+        overwrite = options['overwrite']
 
-    def populate_warlock(self):
-        """Warlock - Pact Magic"""
-        try:
-            warlock = CharacterClass.objects.get(slug='warlock')
-            self.stdout.write(f'📜 Configurando {warlock.name}...')
-            
-            # Progressão do Warlock (Pact Magic)
-            progressions = [
-                # (Nível, Slots, Nível do Slot, Cantrips, Spells Known, Features)
-                (1, 1, 1, 2, 2, ['Otherworldly Patron', 'Pact Magic']),
-                (2, 2, 1, 2, 3, ['Eldritch Invocations']),
-                (3, 2, 2, 2, 4, ['Pact Boon']),
-                (4, 2, 2, 3, 5, ['Ability Score Improvement']),
-                (5, 2, 3, 3, 6, []),
-                (6, 2, 3, 3, 7, ['Otherworldly Patron Feature']),
-                (7, 2, 4, 3, 8, []),
-                (8, 2, 4, 3, 9, ['Ability Score Improvement']),
-                (9, 2, 5, 3, 10, []),
-                (10, 2, 5, 4, 10, ['Otherworldly Patron Feature']),
-                (11, 3, 5, 4, 11, ['Mystic Arcanum (6th level)']),
-                (12, 3, 5, 4, 11, ['Ability Score Improvement']),
-                (13, 3, 5, 4, 12, ['Mystic Arcanum (7th level)']),
-                (14, 3, 5, 4, 12, ['Otherworldly Patron Feature']),
-                (15, 3, 5, 4, 13, ['Mystic Arcanum (8th level)']),
-                (16, 3, 5, 4, 13, ['Ability Score Improvement']),
-                (17, 4, 5, 4, 14, ['Mystic Arcanum (9th level)']),
-                (18, 4, 5, 4, 14, []),
-                (19, 4, 5, 4, 15, ['Ability Score Improvement']),
-                (20, 4, 5, 4, 15, ['Eldritch Master']),
-            ]
-            
-            self._create_warlock_progressions(warlock, progressions)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Warlock não encontrado')
+        progressions_data = {
+            'artificer': self.get_artificer_progression(),
+            'barbarian': self.get_barbarian_progression(),
+            'bard': self.get_bard_progression(),
+            'cleric': self.get_cleric_progression(),
+            'druid': self.get_druid_progression(),
+            'fighter': self.get_fighter_progression(),
+            'monk': self.get_monk_progression(),
+            'paladin': self.get_paladin_progression(),
+            'ranger': self.get_ranger_progression(),
+            'rogue': self.get_rogue_progression(),
+            'sorcerer': self.get_sorcerer_progression(),
+            'warlock': self.get_warlock_progression(),
+            'wizard': self.get_wizard_progression(),
+        }
 
-    def populate_wizard(self):
-        """Wizard - Full Caster"""
-        try:
-            wizard = CharacterClass.objects.get(slug='wizard')
-            self.stdout.write(f'🧙‍♂️ Configurando {wizard.name}...')
-            
-            # Wizard específico - Cantrips conhecidos (não prepara cantrips)
-            wizard_cantrips = [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-            wizard_data = [(cantrips, 0) for cantrips in wizard_cantrips]  # 0 = prepara feitiços
-            
-            self._create_full_caster_progression(wizard, wizard_data, self._get_wizard_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Wizard não encontrado')
+        self.stdout.write(self.style.SUCCESS("Iniciando a população das progressões de classe..."))
 
-    def populate_sorcerer(self):
-        """Sorcerer - Full Caster (Conhece feitiços)"""
-        try:
-            sorcerer = CharacterClass.objects.get(slug='sorcerer')
-            self.stdout.write(f'🔥 Configurando {sorcerer.name}...')
-            
-            # Sorcerer - Feitiços conhecidos e cantrips
-            sorcerer_data = [
-                # (Cantrips, Spells Known)
-                (4, 2), (4, 3), (4, 4), (5, 5), (5, 6),   # 1-5
-                (5, 7), (5, 8), (5, 9), (5, 10), (6, 11), # 6-10
-                (6, 12), (6, 12), (6, 13), (6, 13), (6, 14), # 11-15
-                (6, 14), (6, 15), (6, 15), (6, 15), (6, 15), # 16-20
-            ]
-            
-            self._create_full_caster_progression(sorcerer, sorcerer_data, self._get_sorcerer_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Sorcerer não encontrado')
-
-    def populate_bard(self):
-        """Bard - Full Caster (Conhece feitiços)"""
-        try:
-            bard = CharacterClass.objects.get(slug='bard')
-            self.stdout.write(f'🎵 Configurando {bard.name}...')
-            
-            # Bard - Feitiços conhecidos e cantrips
-            bard_data = [
-                # (Cantrips, Spells Known)
-                (2, 4), (2, 5), (2, 6), (3, 7), (3, 8),   # 1-5
-                (3, 9), (3, 10), (3, 11), (3, 12), (4, 14), # 6-10
-                (4, 15), (4, 15), (4, 16), (4, 18), (4, 19), # 11-15
-                (4, 19), (4, 20), (4, 22), (4, 22), (4, 22), # 16-20
-            ]
-            
-            self._create_full_caster_progression(bard, bard_data, self._get_bard_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Bard não encontrado')
-
-    def populate_cleric(self):
-        """Cleric - Full Caster (Prepara feitiços)"""
-        try:
-            cleric = CharacterClass.objects.get(slug='cleric')
-            self.stdout.write(f'✨ Configurando {cleric.name}...')
-            
-            # Cleric - Cantrips conhecidos (prepara feitiços)
-            cleric_cantrips = [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-            cleric_data = [(cantrips, 0) for cantrips in cleric_cantrips]  # 0 = prepara feitiços
-            
-            self._create_full_caster_progression(cleric, cleric_data, self._get_cleric_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Cleric não encontrado')
-
-    def populate_druid(self):
-        """Druid - Full Caster (Prepara feitiços)"""
-        try:
-            druid = CharacterClass.objects.get(slug='druid')
-            self.stdout.write(f'🌿 Configurando {druid.name}...')
-            
-            # Druid - Cantrips conhecidos (prepara feitiços)
-            druid_cantrips = [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-            druid_data = [(cantrips, 0) for cantrips in druid_cantrips]  # 0 = prepara feitiços
-            
-            self._create_full_caster_progression(druid, druid_data, self._get_druid_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Druid não encontrado')
-
-    def populate_paladin(self):
-        """Paladin - Half Caster"""
-        try:
-            paladin = CharacterClass.objects.get(slug='paladin')
-            self.stdout.write(f'🛡️ Configurando {paladin.name}...')
-            
-            # Half Caster spell slots (Paladin, Ranger)
-            half_caster_slots = [
-                # [1º, 2º, 3º, 4º, 5º]
-                [0, 0, 0, 0, 0],  # Nível 1
-                [2, 0, 0, 0, 0],  # Nível 2
-                [3, 0, 0, 0, 0],  # Nível 3
-                [3, 0, 0, 0, 0],  # Nível 4
-                [4, 2, 0, 0, 0],  # Nível 5
-                [4, 2, 0, 0, 0],  # Nível 6
-                [4, 3, 0, 0, 0],  # Nível 7
-                [4, 3, 0, 0, 0],  # Nível 8
-                [4, 3, 2, 0, 0],  # Nível 9
-                [4, 3, 2, 0, 0],  # Nível 10
-                [4, 3, 3, 0, 0],  # Nível 11
-                [4, 3, 3, 0, 0],  # Nível 12
-                [4, 3, 3, 1, 0],  # Nível 13
-                [4, 3, 3, 1, 0],  # Nível 14
-                [4, 3, 3, 2, 0],  # Nível 15
-                [4, 3, 3, 2, 0],  # Nível 16
-                [4, 3, 3, 3, 1],  # Nível 17
-                [4, 3, 3, 3, 1],  # Nível 18
-                [4, 3, 3, 3, 2],  # Nível 19
-                [4, 3, 3, 3, 2],  # Nível 20
-            ]
-            
-            self._create_half_caster_progression(paladin, half_caster_slots, self._get_paladin_features)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Paladin não encontrado')
-
-    def populate_ranger(self):
-        """Ranger - Half Caster"""
-        try:
-            ranger = CharacterClass.objects.get(slug='ranger')
-            self.stdout.write(f'🏹 Configurando {ranger.name}...')
-            
-            # Usar mesma estrutura do Paladin para half-casters
-            half_caster_slots = [
-                [0, 0, 0, 0, 0],  # Nível 1
-                [2, 0, 0, 0, 0],  # Nível 2
-                [3, 0, 0, 0, 0],  # Nível 3
-                [3, 0, 0, 0, 0],  # Nível 4
-                [4, 2, 0, 0, 0],  # Nível 5
-                [4, 2, 0, 0, 0],  # Nível 6
-                [4, 3, 0, 0, 0],  # Nível 7
-                [4, 3, 0, 0, 0],  # Nível 8
-                [4, 3, 2, 0, 0],  # Nível 9
-                [4, 3, 2, 0, 0],  # Nível 10
-                [4, 3, 3, 0, 0],  # Nível 11
-                [4, 3, 3, 0, 0],  # Nível 12
-                [4, 3, 3, 1, 0],  # Nível 13
-                [4, 3, 3, 1, 0],  # Nível 14
-                [4, 3, 3, 2, 0],  # Nível 15
-                [4, 3, 3, 2, 0],  # Nível 16
-                [4, 3, 3, 3, 1],  # Nível 17
-                [4, 3, 3, 3, 1],  # Nível 18
-                [4, 3, 3, 3, 2],  # Nível 19
-                [4, 3, 3, 3, 2],  # Nível 20
-            ]
-            
-            # Ranger - Feitiços conhecidos
-            ranger_spells_known = [0, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11]
-            
-            self._create_half_caster_progression(
-                ranger, 
-                half_caster_slots, 
-                self._get_ranger_features,
-                ranger_spells_known
-            )
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Ranger não encontrado')
-
-    def populate_eldritch_knight(self):
-        """Eldritch Knight (Fighter subclass) - Third Caster"""
-        try:
-            fighter = CharacterClass.objects.get(slug='fighter')
-            self.stdout.write(f'⚔️ Configurando {fighter.name} (incluindo Eldritch Knight)...')
-            
-            # Third Caster spell slots (EK, AT) - começam no nível 3
-            third_caster_slots = [
-                [0, 0, 0, 0],  # Nível 1
-                [0, 0, 0, 0],  # Nível 2
-                [2, 0, 0, 0],  # Nível 3
-                [3, 0, 0, 0],  # Nível 4
-                [3, 0, 0, 0],  # Nível 5
-                [3, 0, 0, 0],  # Nível 6
-                [4, 2, 0, 0],  # Nível 7
-                [4, 2, 0, 0],  # Nível 8
-                [4, 2, 0, 0],  # Nível 9
-                [4, 3, 0, 0],  # Nível 10
-                [4, 3, 0, 0],  # Nível 11
-                [4, 3, 0, 0],  # Nível 12
-                [4, 3, 2, 0],  # Nível 13
-                [4, 3, 2, 0],  # Nível 14
-                [4, 3, 2, 0],  # Nível 15
-                [4, 3, 3, 0],  # Nível 16
-                [4, 3, 3, 0],  # Nível 17
-                [4, 3, 3, 0],  # Nível 18
-                [4, 3, 3, 1],  # Nível 19
-                [4, 3, 3, 1],  # Nível 20
-            ]
-            
-            # Fighter/EK - Cantrips e feitiços conhecidos
-            ek_cantrips = [0, 0, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-            ek_spells = [0, 0, 2, 3, 3, 3, 4, 4, 4, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9]
-            
-            self._create_fighter_progression(fighter, third_caster_slots, ek_cantrips, ek_spells)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Fighter não encontrado')
-
-    def populate_arcane_trickster(self):
-        """Arcane Trickster (Rogue subclass) - Third Caster"""
-        try:
-            rogue = CharacterClass.objects.get(slug='rogue')
-            self.stdout.write(f'🗡️ Configurando {rogue.name} (incluindo Arcane Trickster)...')
-            
-            # Mesmos slots do EK
-            third_caster_slots = [
-                [0, 0, 0, 0],  # Nível 1
-                [0, 0, 0, 0],  # Nível 2
-                [2, 0, 0, 0],  # Nível 3
-                [3, 0, 0, 0],  # Nível 4
-                [3, 0, 0, 0],  # Nível 5
-                [3, 0, 0, 0],  # Nível 6
-                [4, 2, 0, 0],  # Nível 7
-                [4, 2, 0, 0],  # Nível 8
-                [4, 2, 0, 0],  # Nível 9
-                [4, 3, 0, 0],  # Nível 10
-                [4, 3, 0, 0],  # Nível 11
-                [4, 3, 0, 0],  # Nível 12
-                [4, 3, 2, 0],  # Nível 13
-                [4, 3, 2, 0],  # Nível 14
-                [4, 3, 2, 0],  # Nível 15
-                [4, 3, 3, 0],  # Nível 16
-                [4, 3, 3, 0],  # Nível 17
-                [4, 3, 3, 0],  # Nível 18
-                [4, 3, 3, 1],  # Nível 19
-                [4, 3, 3, 1],  # Nível 20
-            ]
-            
-            # Rogue/AT - Cantrips e feitiços conhecidos (igual ao EK)
-            at_cantrips = [0, 0, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-            at_spells = [0, 0, 2, 3, 3, 3, 4, 4, 4, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9]
-            
-            self._create_rogue_progression(rogue, third_caster_slots, at_cantrips, at_spells)
-            
-        except CharacterClass.DoesNotExist:
-            self.stdout.write('❌ Rogue não encontrado')
-
-    def populate_non_casters(self):
-        """Classes não-mágicas"""
-        non_caster_classes = ['barbarian', 'monk']
-        
-        for class_slug in non_caster_classes:
+        for class_slug, progression_list in progressions_data.items():
             try:
-                char_class = CharacterClass.objects.get(slug=class_slug)
-                self.stdout.write(f'⚔️ Configurando {char_class.name}...')
+                character_class = CharacterClass.objects.get(name__iexact=class_slug)
                 
-                for level in range(1, 21):
-                    try:
-                        progression, created = ClassLevelProgression.objects.get_or_create(
-                            character_class=char_class,
-                            level=level,
-                            defaults={
-                                'proficiency_bonus': 2 + ((level - 1) // 4),
-                                'cantrips_known': 0,
-                                'spells_known': 0,
-                                'features_gained': self._get_martial_features(class_slug, level),
-                            }
-                        )
-                        # Zerar todos os spell slots
-                        for i in range(1, 10):
-                            setattr(progression, f'spell_slots_{i}', 0)
-                        progression.save()
-                        if created:
-                            self.stdout.write(f'  ✅ {char_class.name} nível {level}')
-                    except Exception as e:
-                        self.stdout.write(f'❌ Erro ao criar progressão para {char_class.name} nível {level}: {e}')
+                if overwrite:
+                    # Remove progressões existentes para esta classe
+                    count, _ = ClassProgression.objects.filter(character_class=character_class).delete()
+                    if count > 0:
+                        self.stdout.write(f'  - Removidas {count} progressões existentes para {character_class.name}')
+
+                # Cria novas progressões
+                for level_data in progression_list:
+                    progression, created = ClassProgression.objects.get_or_create(
+                        character_class=character_class,
+                        level=level_data['level'],
+                        defaults=level_data
+                    )
+                    
+                    if created:
+                        self.stdout.write(f'  - Criada progressão nível {level_data["level"]} para {character_class.name}')
+                    elif overwrite:
+                        # Se não foi criado mas overwrite é true, significa que atualizamos
+                         self.stdout.write(f'  - Sobrescrita progressão nível {level_data["level"]} para {character_class.name}')
+                    else:
+                        self.stdout.write(f'  - Progressão nível {level_data["level"]} para {character_class.name} já existe. Pulando.')
+
             except CharacterClass.DoesNotExist:
-                self.stdout.write(f'❌ {class_slug} não encontrado')
-
-    def _create_rogue_progression(self, char_class, slot_table, cantrips_table, spells_table):
-        """Cria progressão específica do Rogue (com Arcane Trickster)"""
-        for level in range(1, 21):
-            slots = slot_table[level - 1] if level <= len(slot_table) else [0, 0, 0, 0]
-            cantrips = cantrips_table[level - 1]
-            spells_known = spells_table[level - 1]
-            
-            progression, created = ClassLevelProgression.objects.get_or_create(
-                character_class=char_class,
-                level=level,
-                defaults={
-                    'proficiency_bonus': 2 + ((level - 1) // 4),
-                    'cantrips_known': cantrips,
-                    'spells_known': spells_known,
-                    'features_gained': self._get_rogue_features(level),
-                }
-            )
-            
-            # Zerar todos os spell slots
-            for i in range(1, 10):
-                setattr(progression, f'spell_slots_{i}', 0)
-            
-            # Definir spell slots (só até 4º nível para third casters)
-            if level >= 3:  # Third casters só ganham magia no nível 3
-                for i in range(4):
-                    setattr(progression, f'spell_slots_{i + 1}', slots[i])
-            
-            progression.cantrips_known = cantrips
-            progression.spells_known = spells_known
-            progression.features_gained = self._get_rogue_features(level)
-            progression.save()
-            
-            if created:
-                self.stdout.write(f'  ✅ {char_class.name} nível {level}')
-
-    # ========================================
-    # FEATURES POR CLASSE
-    # ========================================
-
-    def _get_wizard_features(self, level):
-        features = {
-            1: ['Spellcasting', 'Arcane Recovery'],
-            2: ['Arcane Tradition'],
-            3: ['Arcane Tradition Feature'],
-            4: ['Ability Score Improvement'],
-            5: [],
-            6: ['Arcane Tradition Feature'],
-            7: [],
-            8: ['Ability Score Improvement'],
-            9: [],
-            10: ['Arcane Tradition Feature'],
-            11: [],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Arcane Tradition Feature'],
-            15: [],
-            16: ['Ability Score Improvement'],
-            17: [],
-            18: ['Spell Mastery'],
-            19: ['Ability Score Improvement'],
-            20: ['Signature Spell'],
-        }
-        return features.get(level, [])
-
-    def _get_sorcerer_features(self, level):
-        features = {
-            1: ['Spellcasting', 'Sorcerous Origin'],
-            2: ['Font of Magic'],
-            3: ['Metamagic'],
-            4: ['Ability Score Improvement'],
-            5: [],
-            6: ['Sorcerous Origin Feature'],
-            7: [],
-            8: ['Ability Score Improvement'],
-            9: [],
-            10: ['Metamagic', 'Sorcerous Origin Feature'],
-            11: [],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Sorcerous Origin Feature'],
-            15: [],
-            16: ['Ability Score Improvement'],
-            17: ['Metamagic'],
-            18: ['Sorcerous Origin Feature'],
-            19: ['Ability Score Improvement'],
-            20: ['Sorcerous Restoration'],
-        }
-        return features.get(level, [])
-
-    def _get_bard_features(self, level):
-        features = {
-            1: ['Spellcasting', 'Bardic Inspiration'],
-            2: ['Jack of All Trades', 'Song of Rest'],
-            3: ['Bard College', 'Expertise'],
-            4: ['Ability Score Improvement'],
-            5: ['Bardic Inspiration (d8)', 'Font of Inspiration'],
-            6: ['Countercharm', 'Bard College Feature'],
-            7: [],
-            8: ['Ability Score Improvement'],
-            9: ['Song of Rest (d8)'],
-            10: ['Bardic Inspiration (d10)', 'Expertise', 'Magical Secrets'],
-            11: [],
-            12: ['Ability Score Improvement'],
-            13: ['Song of Rest (d10)'],
-            14: ['Magical Secrets', 'Bard College Feature'],
-            15: ['Bardic Inspiration (d12)'],
-            16: ['Ability Score Improvement'],
-            17: ['Song of Rest (d12)'],
-            18: ['Magical Secrets'],
-            19: ['Ability Score Improvement'],
-            20: ['Superior Inspiration'],
-        }
-        return features.get(level, [])
-
-    def _get_cleric_features(self, level):
-        features = {
-            1: ['Spellcasting', 'Divine Domain'],
-            2: ['Channel Divinity', 'Divine Domain Feature'],
-            3: [],
-            4: ['Ability Score Improvement'],
-            5: ['Destroy Undead (CR 1/2)'],
-            6: ['Channel Divinity (2/rest)', 'Divine Domain Feature'],
-            7: [],
-            8: ['Ability Score Improvement', 'Destroy Undead (CR 1)', 'Divine Domain Feature'],
-            9: [],
-            10: ['Divine Intervention'],
-            11: ['Destroy Undead (CR 2)'],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Destroy Undead (CR 3)'],
-            15: [],
-            16: ['Ability Score Improvement'],
-            17: ['Destroy Undead (CR 4)', 'Divine Domain Feature'],
-            18: ['Channel Divinity (3/rest)'],
-            19: ['Ability Score Improvement'],
-            20: ['Divine Intervention Improvement'],
-        }
-        return features.get(level, [])
-
-    def _get_druid_features(self, level):
-        features = {
-            1: ['Spellcasting', 'Druidcraft'],
-            2: ['Wild Shape', 'Druid Circle'],
-            3: [],
-            4: ['Wild Shape Improvement', 'Ability Score Improvement'],
-            5: [],
-            6: ['Druid Circle Feature'],
-            7: [],
-            8: ['Wild Shape Improvement', 'Ability Score Improvement'],
-            9: [],
-            10: ['Druid Circle Feature'],
-            11: [],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Druid Circle Feature'],
-            15: [],
-            16: ['Ability Score Improvement'],
-            17: [],
-            18: ['Timeless Body', 'Beast Spells'],
-            19: ['Ability Score Improvement'],
-            20: ['Archdruid'],
-        }
-        return features.get(level, [])
-
-    def _get_paladin_features(self, level):
-        features = {
-            1: ['Divine Sense', 'Lay on Hands'],
-            2: ['Fighting Style', 'Spellcasting', 'Divine Smite'],
-            3: ['Divine Health', 'Sacred Oath'],
-            4: ['Ability Score Improvement'],
-            5: ['Extra Attack'],
-            6: ['Aura of Protection'],
-            7: ['Sacred Oath Feature'],
-            8: ['Ability Score Improvement'],
-            9: [],
-            10: ['Aura of Courage'],
-            11: ['Improved Divine Smite'],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Cleansing Touch'],
-            15: ['Sacred Oath Feature'],
-            16: ['Ability Score Improvement'],
-            17: [],
-            18: ['Aura Improvements'],
-            19: ['Ability Score Improvement'],
-            20: ['Sacred Oath Feature'],
-        }
-        return features.get(level, [])
-
-    def _get_ranger_features(self, level):
-        features = {
-            1: ['Favored Enemy', 'Natural Explorer'],
-            2: ['Fighting Style', 'Spellcasting'],
-            3: ['Ranger Archetype', 'Primeval Awareness'],
-            4: ['Ability Score Improvement'],
-            5: ['Extra Attack'],
-            6: ['Favored Enemy and Natural Explorer improvements'],
-            7: ['Ranger Archetype Feature'],
-            8: ['Ability Score Improvement', 'Lands Stride'],
-            9: [],
-            10: ['Natural Explorer improvement', 'Hide in Plain Sight'],
-            11: ['Ranger Archetype Feature'],
-            12: ['Ability Score Improvement'],
-            13: [],
-            14: ['Favored Enemy improvement', 'Vanish'],
-            15: ['Ranger Archetype Feature'],
-            16: ['Ability Score Improvement'],
-            17: [],
-            18: ['Feral Senses'],
-            19: ['Ability Score Improvement'],
-            20: ['Foe Slayer'],
-        }
-        return features.get(level, [])
-
-    def _get_fighter_features(self, level):
-        features = {
-            1: ['Fighting Style', 'Second Wind'],
-            2: ['Action Surge'],
-            3: ['Martial Archetype'],
-            4: ['Ability Score Improvement'],
-            5: ['Extra Attack'],
-            6: ['Ability Score Improvement'],
-            7: ['Martial Archetype Feature'],
-            8: ['Ability Score Improvement'],
-            9: ['Indomitable'],
-            10: ['Martial Archetype Feature'],
-            11: ['Extra Attack (2)'],
-            12: ['Ability Score Improvement'],
-            13: ['Indomitable (2/rest)'],
-            14: ['Ability Score Improvement'],
-            15: ['Martial Archetype Feature'],
-            16: ['Ability Score Improvement'],
-            17: ['Action Surge (2/rest)', 'Indomitable (3/rest)'],
-            18: ['Martial Archetype Feature'],
-            19: ['Ability Score Improvement'],
-            20: ['Extra Attack (3)'],
-        }
-        return features.get(level, [])
-
-    def _get_rogue_features(self, level):
-        features = {
-            1: ['Expertise', 'Sneak Attack', 'Thieves Cant'],
-            2: ['Cunning Action'],
-            3: ['Roguish Archetype'],
-            4: ['Ability Score Improvement'],
-            5: ['Uncanny Dodge'],
-            6: ['Expertise'],
-            7: ['Evasion'],
-            8: ['Ability Score Improvement'],
-            9: ['Roguish Archetype Feature'],
-            10: ['Ability Score Improvement'],
-            11: ['Reliable Talent'],
-            12: ['Ability Score Improvement'],
-            13: ['Roguish Archetype Feature'],
-            14: ['Blindsense'],
-            15: ['Slippery Mind'],
-            16: ['Ability Score Improvement'],
-            17: ['Roguish Archetype Feature'],
-            18: ['Elusive'],
-            19: ['Ability Score Improvement'],
-            20: ['Stroke of Luck'],
-        }
-        return features.get(level, [])
-
-    def _get_martial_features(self, class_slug, level):
-        """Features para classes não-mágicas"""
-        if class_slug == 'barbarian':
-            features = {
-                1: ['Rage', 'Unarmored Defense'],
-                2: ['Reckless Attack', 'Danger Sense'],
-                3: ['Primal Path'],
-                4: ['Ability Score Improvement'],
-                5: ['Extra Attack', 'Fast Movement'],
-                6: ['Path Feature'],
-                7: ['Feral Instinct'],
-                8: ['Ability Score Improvement'],
-                9: ['Brutal Critical (1 die)'],
-                10: ['Path Feature'],
-                11: ['Relentless Rage'],
-                12: ['Ability Score Improvement'],
-                13: ['Brutal Critical (2 dice)'],
-                14: ['Path Feature'],
-                15: ['Persistent Rage'],
-                16: ['Ability Score Improvement'],
-                17: ['Brutal Critical (3 dice)'],
-                18: ['Indomitable Might'],
-                19: ['Ability Score Improvement'],
-                20: ['Primal Champion'],
-            }
-        elif class_slug == 'monk':
-            features = {
-                1: ['Unarmored Defense', 'Martial Arts'],
-                2: ['Ki', 'Unarmored Movement'],
-                3: ['Monastic Tradition', 'Deflect Missiles'],
-                4: ['Ability Score Improvement', 'Slow Fall'],
-                5: ['Extra Attack', 'Stunning Strike'],
-                6: ['Ki-Empowered Strikes', 'Monastic Tradition Feature'],
-                7: ['Evasion', 'Stillness of Mind'],
-                8: ['Ability Score Improvement'],
-                9: ['Unarmored Movement Improvement'],
-                10: ['Purity of Body'],
-                11: ['Monastic Tradition Feature'],
-                12: ['Ability Score Improvement'],
-                13: ['Tongue of the Sun and Moon'],
-                14: ['Diamond Soul'],
-                15: ['Timeless Body'],
-                16: ['Ability Score Improvement'],
-                17: ['Monastic Tradition Feature'],
-                18: ['Empty Body'],
-                19: ['Ability Score Improvement'],
-                20: ['Perfect Self'],
-            }
-        else:
-            features = {level: []}
-        
-        return features.get(level, [])
-
-    # ========================================
-    # MÉTODOS AUXILIARES
-    # ========================================
-
-    def _create_warlock_progressions(self, char_class, progressions):
-        """Cria progressões específicas do Warlock"""
-        for level, slot_count, slot_level, cantrips, spells_known, features in progressions:
-            progression, created = ClassLevelProgression.objects.get_or_create(
-                character_class=char_class,
-                level=level,
-                defaults={
-                    'proficiency_bonus': 2 + ((level - 1) // 4),
-                    'cantrips_known': cantrips,
-                    'spells_known': spells_known,
-                    'features_gained': features,
-                }
-            )
-            
-            # Limpar todos os spell slots
-            for i in range(1, 10):
-                setattr(progression, f'spell_slots_{i}', 0)
-            
-            # Definir spell slots específicos para Warlock
-            if slot_count > 0:
-                setattr(progression, f'spell_slots_{slot_level}', slot_count)
-            
-            progression.cantrips_known = cantrips
-            progression.spells_known = spells_known
-            progression.features_gained = features
-            progression.save()
-            
-            if created:
-                self.stdout.write(f'  ✅ {char_class.name} nível {level}')
-
-    def _create_full_caster_progression(self, char_class, class_data, features_func):
-        """Cria progressão para full casters"""
-        # Spell slots para Full Casters
-        full_caster_slots = [
-            [2, 0, 0, 0, 0, 0, 0, 0, 0],  # Nível 1
-            [3, 0, 0, 0, 0, 0, 0, 0, 0],  # Nível 2
-            [4, 2, 0, 0, 0, 0, 0, 0, 0],  # Nível 3
-            [4, 3, 0, 0, 0, 0, 0, 0, 0],  # Nível 4
-            [4, 3, 2, 0, 0, 0, 0, 0, 0],  # Nível 5
-            [4, 3, 3, 0, 0, 0, 0, 0, 0],  # Nível 6
-            [4, 3, 3, 1, 0, 0, 0, 0, 0],  # Nível 7
-            [4, 3, 3, 2, 0, 0, 0, 0, 0],  # Nível 8
-            [4, 3, 3, 3, 1, 0, 0, 0, 0],  # Nível 9
-            [4, 3, 3, 3, 2, 0, 0, 0, 0],  # Nível 10
-            [4, 3, 3, 3, 2, 1, 0, 0, 0],  # Nível 11
-            [4, 3, 3, 3, 2, 1, 0, 0, 0],  # Nível 12
-            [4, 3, 3, 3, 2, 1, 1, 0, 0],  # Nível 13
-            [4, 3, 3, 3, 2, 1, 1, 0, 0],  # Nível 14
-            [4, 3, 3, 3, 2, 1, 1, 1, 0],  # Nível 15
-            [4, 3, 3, 3, 2, 1, 1, 1, 0],  # Nível 16
-            [4, 3, 3, 3, 2, 1, 1, 1, 1],  # Nível 17
-            [4, 3, 3, 3, 3, 1, 1, 1, 1],  # Nível 18
-            [4, 3, 3, 3, 3, 2, 1, 1, 1],  # Nível 19
-            [4, 3, 3, 3, 3, 2, 2, 1, 1],  # Nível 20
-        ]
-        
-        for level in range(1, 21):
-            cantrips, spells_known = class_data[level - 1]
-            
-            progression, created = ClassLevelProgression.objects.get_or_create(
-                character_class=char_class,
-                level=level,
-                defaults={
-                    'proficiency_bonus': 2 + ((level - 1) // 4),
-                    'cantrips_known': cantrips,
-                    'spells_known': spells_known,
-                    'features_gained': features_func(level),
-                }
-            )
-            
-            # Definir spell slots
-            slots = full_caster_slots[level - 1]
-            for i in range(9):
-                setattr(progression, f'spell_slots_{i + 1}', slots[i])
-            
-            progression.cantrips_known = cantrips
-            progression.spells_known = spells_known
-            progression.features_gained = features_func(level)
-            progression.save()
-            
-            if created:
-                self.stdout.write(f'  ✅ {char_class.name} nível {level}')
-
-    def _create_half_caster_progression(self, char_class, slot_table, features_func, spells_known_table=None):
-        """Cria progressão para half casters"""
-        for level in range(1, 21):
-            # Spell slots (só até 5º nível para half casters)
-            slots = slot_table[level - 1] if level <= len(slot_table) else [0, 0, 0, 0, 0]
-            
-            # Spells known (se fornecido)
-            spells_known = spells_known_table[level - 1] if spells_known_table else 0
-            
-            progression, created = ClassLevelProgression.objects.get_or_create(
-                character_class=char_class,
-                level=level,
-                defaults={
-                    'proficiency_bonus': 2 + ((level - 1) // 4),
-                    'cantrips_known': 0,  # Half casters não têm cantrips
-                    'spells_known': spells_known,
-                    'features_gained': features_func(level),
-                }
-            )
-            
-            # Zerar todos os spell slots primeiro
-            for i in range(1, 10):
-                setattr(progression, f'spell_slots_{i}', 0)
-            
-            # Definir spell slots (só até 5º nível)
-            if level >= 2:  # Half casters só ganham magia no nível 2
-                for i in range(5):
-                    setattr(progression, f'spell_slots_{i + 1}', slots[i])
-            
-            progression.spells_known = spells_known
-            progression.features_gained = features_func(level)
-            progression.save()
-            
-            if created:
-                self.stdout.write(f'  ✅ {char_class.name} nível {level}')
-
-    def _create_fighter_progression(self, char_class, slot_table, cantrips_table, spells_table):
-            """Cria progressão específica do Fighter (com Eldritch Knight)"""
-            for level in range(1, 21):
-                slots = slot_table[level - 1] if level <= len(slot_table) else [0, 0, 0, 0]
-                cantrips = cantrips_table[level - 1]
-                spells_known = spells_table[level - 1]
-
-                progression, created = ClassLevelProgression.objects.get_or_create(
-                    character_class=char_class,
-                    level=level,
-                    defaults={
-                        'proficiency_bonus': 2 + ((level - 1) // 4),
-                        'cantrips_known': cantrips,
-                        'spells_known': spells_known,
-                        'features_gained': self._get_fighter_features(level),
-                    }
+                self.stdout.write(
+                    self.style.ERROR(f'CLASSE NÃO ENCONTRADA: A classe "{class_slug}" não foi encontrada no banco de dados.')
                 )
 
-                # Zerar todos os spell slots
-                for i in range(1, 10):
-                    setattr(progression, f'spell_slots_{i}', 0)
+        self.stdout.write(
+            self.style.SUCCESS('✨ Processo de população concluído com sucesso!')
+        )
 
-                # Definir spell slots (só até 4º nível para third casters)
-                if level >= 3:  # Third casters só ganham magia no nível 3
-                    for i in range(4):
-                        setattr(progression, f'spell_slots_{i + 1}', slots[i])
+    # =================================================================================
+    # DADOS DE PROGRESSÃO POR CLASSE
+    # =================================================================================
 
-                progression.cantrips_known = cantrips
-                progression.spells_known = spells_known
-                progression.features_gained = self._get_fighter_features(level)
-                progression.save()
+    def get_artificer_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Magical Tinkering', 'Spellcasting'], 'cantrips_known': 2, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Infuse Item'], 'cantrips_known': 2, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 4, 'infused_items': 2},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Artificer Specialist', 'The Right Tool for the Job'], 'cantrips_known': 2, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 4, 'infused_items': 2},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'cantrips_known': 2, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 4, 'infused_items': 2},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Artificer Specialist feature'], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 4, 'infused_items': 2},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Tool Expertise'], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 6, 'infused_items': 3},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Flash of Genius'], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 6, 'infused_items': 3},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 6, 'infused_items': 3},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Artificer Specialist feature'], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 6, 'infused_items': 3},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Magic Item Adept'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 8, 'infused_items': 4},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Spell-Storing Item'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 8, 'infused_items': 4},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'infusions_known': 8, 'infused_items': 4},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'infusions_known': 8, 'infused_items': 4},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Magic Item Savant'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'infusions_known': 10, 'infused_items': 5},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Artificer Specialist feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'infusions_known': 10, 'infused_items': 5},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'infusions_known': 10, 'infused_items': 5},
+            {'level': 17, 'proficiency_bonus': 6, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'infusions_known': 10, 'infused_items': 5},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Magic Item Master'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'infusions_known': 12, 'infused_items': 6},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'infusions_known': 12, 'infused_items': 6},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Soul of Artifice'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'infusions_known': 12, 'infused_items': 6},
+        ]
 
-                if created:
-                    self.stdout.write(f'  ✅ {char_class.name} nível {level}')
+    def get_barbarian_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Rage', 'Unarmored Defense'], 'rages': 2, 'rage_damage': 2},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Reckless Attack', 'Danger Sense'], 'rages': 2, 'rage_damage': 2},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Primal Path'], 'rages': 3, 'rage_damage': 2},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'rages': 3, 'rage_damage': 2},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Extra Attack', 'Fast Movement'], 'rages': 3, 'rage_damage': 2},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Primal Path feature'], 'rages': 4, 'rage_damage': 2},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Feral Instinct'], 'rages': 4, 'rage_damage': 2},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'rages': 4, 'rage_damage': 2},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Brutal Critical (1 die)'], 'rages': 4, 'rage_damage': 3},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Primal Path feature'], 'rages': 4, 'rage_damage': 3},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Relentless Rage'], 'rages': 4, 'rage_damage': 3},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'rages': 5, 'rage_damage': 3},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Brutal Critical (2 dice)'], 'rages': 5, 'rage_damage': 3},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Primal Path feature'], 'rages': 5, 'rage_damage': 3},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Persistent Rage'], 'rages': 5, 'rage_damage': 3},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'rages': 5, 'rage_damage': 4},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Brutal Critical (3 dice)'], 'rages': 6, 'rage_damage': 4},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Indomitable Might'], 'rages': 6, 'rage_damage': 4},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'rages': 6, 'rage_damage': 4},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Primal Champion'], 'rages': 'Unlimited', 'rage_damage': 4},
+        ]
+
+    def get_bard_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Spellcasting', 'Bardic Inspiration (d6)'], 'cantrips_known': 2, 'spells_known': 4, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Jack of All Trades', 'Song of Rest (d6)'], 'cantrips_known': 2, 'spells_known': 5, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Bard College', 'Expertise'], 'cantrips_known': 2, 'spells_known': 6, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'cantrips_known': 3, 'spells_known': 7, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Bardic Inspiration (d8)', 'Font of Inspiration'], 'cantrips_known': 3, 'spells_known': 8, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Countercharm', 'Bard College feature'], 'cantrips_known': 3, 'spells_known': 9, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 3, 'spells_known': 10, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'cantrips_known': 3, 'spells_known': 11, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Song of Rest (d8)'], 'cantrips_known': 3, 'spells_known': 12, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Bardic Inspiration (d10)', 'Expertise', 'Magical Secrets'], 'cantrips_known': 4, 'spells_known': 14, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 4, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Song of Rest (d10)'], 'cantrips_known': 4, 'spells_known': 16, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Magical Secrets', 'Bard College feature'], 'cantrips_known': 4, 'spells_known': 18, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Bardic Inspiration (d12)'], 'cantrips_known': 4, 'spells_known': 19, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 19, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Song of Rest (d12)'], 'cantrips_known': 4, 'spells_known': 20, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Magical Secrets'], 'cantrips_known': 4, 'spells_known': 22, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 22, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Superior Inspiration'], 'cantrips_known': 4, 'spells_known': 22, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 2, 'spell_slots_8': 1, 'spell_slots_9': 1},
+        ]
+
+    def get_cleric_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Spellcasting', 'Divine Domain'], 'cantrips_known': 3, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Channel Divinity (1/rest)', 'Divine Domain feature'], 'cantrips_known': 3, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Destroy Undead (CR 1/2)'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Channel Divinity (2/rest)', 'Divine Domain feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement', 'Destroy Undead (CR 1)', 'Divine Domain feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Divine Intervention'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Destroy Undead (CR 2)'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Destroy Undead (CR 3)'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Destroy Undead (CR 4)', 'Divine Domain feature'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Channel Divinity (3/rest)'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Divine Intervention Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 2, 'spell_slots_8': 1, 'spell_slots_9': 1},
+        ]
+
+    def get_druid_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Druidic', 'Spellcasting'], 'cantrips_known': 2, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Wild Shape', 'Druid Circle'], 'cantrips_known': 2, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': [], 'cantrips_known': 2, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Wild Shape Improvement', 'Ability Score Improvement'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Druid Circle feature'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Wild Shape Improvement', 'Ability Score Improvement'], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Druid Circle feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Druid Circle feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Timeless Body', 'Beast Spells'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Archdruid'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 2, 'spell_slots_8': 1, 'spell_slots_9': 1},
+        ]
+
+    def get_fighter_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Fighting Style', 'Second Wind']},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Action Surge (one use)']},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Martial Archetype']},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement']},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Extra Attack']},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement']},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Martial Archetype feature']},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement']},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Indomitable (one use)']},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Martial Archetype feature']},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Extra Attack (2)']},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement']},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Indomitable (two uses)']},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement']},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Martial Archetype feature']},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement']},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Action Surge (two uses)', 'Indomitable (three uses)']},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Martial Archetype feature']},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement']},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Extra Attack (3)']},
+        ]
+
+    def get_monk_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Unarmored Defense', 'Martial Arts'], 'martial_arts': '1d4', 'ki_points': 0, 'unarmored_movement': '+0 ft.'},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Ki', 'Unarmored Movement'], 'martial_arts': '1d4', 'ki_points': 2, 'unarmored_movement': '+10 ft.'},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Monastic Tradition', 'Deflect Missiles'], 'martial_arts': '1d4', 'ki_points': 3, 'unarmored_movement': '+10 ft.'},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement', 'Slow Fall'], 'martial_arts': '1d4', 'ki_points': 4, 'unarmored_movement': '+10 ft.'},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Extra Attack', 'Stunning Strike'], 'martial_arts': '1d6', 'ki_points': 5, 'unarmored_movement': '+10 ft.'},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Ki-Empowered Strikes', 'Monastic Tradition feature'], 'martial_arts': '1d6', 'ki_points': 6, 'unarmored_movement': '+15 ft.'},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Evasion', 'Stillness of Mind'], 'martial_arts': '1d6', 'ki_points': 7, 'unarmored_movement': '+15 ft.'},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'martial_arts': '1d6', 'ki_points': 8, 'unarmored_movement': '+15 ft.'},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Unarmored Movement improvement'], 'martial_arts': '1d6', 'ki_points': 9, 'unarmored_movement': '+15 ft.'},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Purity of Body'], 'martial_arts': '1d6', 'ki_points': 10, 'unarmored_movement': '+20 ft.'},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Monastic Tradition feature'], 'martial_arts': '1d8', 'ki_points': 11, 'unarmored_movement': '+20 ft.'},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'martial_arts': '1d8', 'ki_points': 12, 'unarmored_movement': '+20 ft.'},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Tongue of the Sun and Moon'], 'martial_arts': '1d8', 'ki_points': 13, 'unarmored_movement': '+20 ft.'},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Diamond Soul'], 'martial_arts': '1d8', 'ki_points': 14, 'unarmored_movement': '+25 ft.'},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Timeless Body'], 'martial_arts': '1d8', 'ki_points': 15, 'unarmored_movement': '+25 ft.'},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'martial_arts': '1d8', 'ki_points': 16, 'unarmored_movement': '+25 ft.'},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Monastic Tradition feature'], 'martial_arts': '1d10', 'ki_points': 17, 'unarmored_movement': '+25 ft.'},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Empty Body'], 'martial_arts': '1d10', 'ki_points': 18, 'unarmored_movement': '+30 ft.'},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'martial_arts': '1d10', 'ki_points': 19, 'unarmored_movement': '+30 ft.'},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Perfect Self'], 'martial_arts': '1d10', 'ki_points': 20, 'unarmored_movement': '+30 ft.'},
+        ]
+
+    def get_paladin_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Divine Sense', 'Lay on Hands'], 'spell_slots_1': 0, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Fighting Style', 'Spellcasting', 'Divine Smite'], 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Divine Health', 'Sacred Oath'], 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Extra Attack'], 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Aura of Protection'], 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Sacred Oath feature'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Aura of Courage'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Improved Divine Smite'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Cleansing Touch'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Sacred Oath feature'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': [], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Aura improvements'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Sacred Oath feature'], 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2},
+        ]
+
+    def get_ranger_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Favored Enemy', 'Natural Explorer'], 'spells_known': 0, 'spell_slots_1': 0, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Fighting Style', 'Spellcasting'], 'spells_known': 2, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Ranger Archetype', 'Primeval Awareness'], 'spells_known': 3, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'spells_known': 3, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Extra Attack'], 'spells_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Favored Enemy and Natural Explorer improvements'], 'spells_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Ranger Archetype feature'], 'spells_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement', 'Land\'s Stride'], 'spells_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'spells_known': 6, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Natural Explorer improvement', 'Hide in Plain Sight'], 'spells_known': 6, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Ranger Archetype feature'], 'spells_known': 7, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'spells_known': 7, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'spells_known': 8, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Favored Enemy improvement', 'Vanish'], 'spells_known': 8, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Ranger Archetype feature'], 'spells_known': 9, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'spells_known': 9, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': [], 'spells_known': 10, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Feral Senses'], 'spells_known': 10, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'spells_known': 11, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Foe Slayer'], 'spells_known': 11, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2},
+        ]
+
+    def get_rogue_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Expertise', 'Sneak Attack (1d6)', 'Thieves\' Cant'], 'sneak_attack': '1d6'},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Cunning Action'], 'sneak_attack': '1d6'},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Roguish Archetype', 'Sneak Attack (2d6)'], 'sneak_attack': '2d6'},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'sneak_attack': '2d6'},
+            {'level': 5, 'proficiency_bonus': 3, 'features': ['Uncanny Dodge', 'Sneak Attack (3d6)'], 'sneak_attack': '3d6'},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Expertise'], 'sneak_attack': '3d6'},
+            {'level': 7, 'proficiency_bonus': 3, 'features': ['Evasion', 'Sneak Attack (4d6)'], 'sneak_attack': '4d6'},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'sneak_attack': '4d6'},
+            {'level': 9, 'proficiency_bonus': 4, 'features': ['Roguish Archetype feature', 'Sneak Attack (5d6)'], 'sneak_attack': '5d6'},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'sneak_attack': '5d6'},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Reliable Talent', 'Sneak Attack (6d6)'], 'sneak_attack': '6d6'},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'sneak_attack': '6d6'},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Roguish Archetype feature', 'Sneak Attack (7d6)'], 'sneak_attack': '7d6'},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Blindsense'], 'sneak_attack': '7d6'},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Slippery Mind', 'Sneak Attack (8d6)'], 'sneak_attack': '8d6'},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'sneak_attack': '8d6'},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Roguish Archetype feature', 'Sneak Attack (9d6)'], 'sneak_attack': '9d6'},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Elusive'], 'sneak_attack': '9d6'},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement', 'Sneak Attack (10d6)'], 'sneak_attack': '10d6'},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Stroke of Luck'], 'sneak_attack': '10d6'},
+        ]
+
+    def get_sorcerer_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Spellcasting', 'Sorcerous Origin'], 'sorcery_points': 0, 'cantrips_known': 4, 'spells_known': 2, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Font of Magic'], 'sorcery_points': 2, 'cantrips_known': 4, 'spells_known': 3, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Metamagic'], 'sorcery_points': 3, 'cantrips_known': 4, 'spells_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'sorcery_points': 4, 'cantrips_known': 5, 'spells_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': [], 'sorcery_points': 5, 'cantrips_known': 5, 'spells_known': 6, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Sorcerous Origin feature'], 'sorcery_points': 6, 'cantrips_known': 5, 'spells_known': 7, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'sorcery_points': 7, 'cantrips_known': 5, 'spells_known': 8, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'sorcery_points': 8, 'cantrips_known': 5, 'spells_known': 9, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'sorcery_points': 9, 'cantrips_known': 5, 'spells_known': 10, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Metamagic'], 'sorcery_points': 10, 'cantrips_known': 6, 'spells_known': 11, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': [], 'sorcery_points': 11, 'cantrips_known': 6, 'spells_known': 12, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'sorcery_points': 12, 'cantrips_known': 6, 'spells_known': 12, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'sorcery_points': 13, 'cantrips_known': 6, 'spells_known': 13, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Sorcerous Origin feature'], 'sorcery_points': 14, 'cantrips_known': 6, 'spells_known': 13, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': [], 'sorcery_points': 15, 'cantrips_known': 6, 'spells_known': 14, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'sorcery_points': 16, 'cantrips_known': 6, 'spells_known': 14, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Metamagic'], 'sorcery_points': 17, 'cantrips_known': 6, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Sorcerous Origin feature'], 'sorcery_points': 18, 'cantrips_known': 6, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'sorcery_points': 19, 'cantrips_known': 6, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Sorcerous Restoration'], 'sorcery_points': 20, 'cantrips_known': 6, 'spells_known': 15, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 2, 'spell_slots_8': 1, 'spell_slots_9': 1},
+        ]
+
+    def get_warlock_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Otherworldly Patron', 'Pact Magic'], 'cantrips_known': 2, 'spells_known': 2, 'spell_slots': 1, 'slot_level': 1, 'invocations_known': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Eldritch Invocations'], 'cantrips_known': 2, 'spells_known': 3, 'spell_slots': 2, 'slot_level': 1, 'invocations_known': 2},
+            {'level': 3, 'proficiency_bonus': 2, 'features': ['Pact Boon'], 'cantrips_known': 2, 'spells_known': 4, 'spell_slots': 2, 'slot_level': 2, 'invocations_known': 2},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement', 'Eldritch Versatility'], 'cantrips_known': 3, 'spells_known': 5, 'spell_slots': 2, 'slot_level': 2, 'invocations_known': 2},
+            {'level': 5, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 3, 'spells_known': 6, 'spell_slots': 2, 'slot_level': 3, 'invocations_known': 3},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Otherworldly Patron feature'], 'cantrips_known': 3, 'spells_known': 7, 'spell_slots': 2, 'slot_level': 3, 'invocations_known': 3},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 3, 'spells_known': 8, 'spell_slots': 2, 'slot_level': 4, 'invocations_known': 4},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'cantrips_known': 3, 'spells_known': 9, 'spell_slots': 2, 'slot_level': 4, 'invocations_known': 4},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 3, 'spells_known': 10, 'spell_slots': 2, 'slot_level': 5, 'invocations_known': 5},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Otherworldly Patron feature'], 'cantrips_known': 4, 'spells_known': 10, 'spell_slots': 2, 'slot_level': 5, 'invocations_known': 5},
+            {'level': 11, 'proficiency_bonus': 4, 'features': ['Mystic Arcanum (6th level)'], 'cantrips_known': 4, 'spells_known': 11, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 5},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 11, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 6},
+            {'level': 13, 'proficiency_bonus': 5, 'features': ['Mystic Arcanum (7th level)'], 'cantrips_known': 4, 'spells_known': 12, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 6},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Otherworldly Patron feature'], 'cantrips_known': 4, 'spells_known': 12, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 6},
+            {'level': 15, 'proficiency_bonus': 5, 'features': ['Mystic Arcanum (8th level)'], 'cantrips_known': 4, 'spells_known': 13, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 7},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 13, 'spell_slots': 3, 'slot_level': 5, 'invocations_known': 7},
+            {'level': 17, 'proficiency_bonus': 6, 'features': ['Mystic Arcanum (9th level)'], 'cantrips_known': 4, 'spells_known': 14, 'spell_slots': 4, 'slot_level': 5, 'invocations_known': 7},
+            {'level': 18, 'proficiency_bonus': 6, 'features': [], 'cantrips_known': 4, 'spells_known': 14, 'spell_slots': 4, 'slot_level': 5, 'invocations_known': 8},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spells_known': 15, 'spell_slots': 4, 'slot_level': 5, 'invocations_known': 8},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Eldritch Master'], 'cantrips_known': 4, 'spells_known': 15, 'spell_slots': 4, 'slot_level': 5, 'invocations_known': 8},
+        ]
+
+    def get_wizard_progression(self):
+        return [
+            {'level': 1, 'proficiency_bonus': 2, 'features': ['Spellcasting', 'Arcane Recovery'], 'cantrips_known': 3, 'spell_slots_1': 2, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 2, 'proficiency_bonus': 2, 'features': ['Arcane Tradition'], 'cantrips_known': 3, 'spell_slots_1': 3, 'spell_slots_2': 0, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 3, 'proficiency_bonus': 2, 'features': [], 'cantrips_known': 3, 'spell_slots_1': 4, 'spell_slots_2': 2, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 4, 'proficiency_bonus': 2, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 0, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 5, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 2, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 6, 'proficiency_bonus': 3, 'features': ['Arcane Tradition feature'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 0, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 7, 'proficiency_bonus': 3, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 1, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 8, 'proficiency_bonus': 3, 'features': ['Ability Score Improvement'], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 2, 'spell_slots_5': 0, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 9, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 4, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 1, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 10, 'proficiency_bonus': 4, 'features': ['Arcane Tradition feature'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 0, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 11, 'proficiency_bonus': 4, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 12, 'proficiency_bonus': 4, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 0, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 13, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 14, 'proficiency_bonus': 5, 'features': ['Arcane Tradition feature'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 0, 'spell_slots_9': 0},
+            {'level': 15, 'proficiency_bonus': 5, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 16, 'proficiency_bonus': 5, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 0},
+            {'level': 17, 'proficiency_bonus': 6, 'features': [], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 2, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 18, 'proficiency_bonus': 6, 'features': ['Spell Mastery'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 1, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 19, 'proficiency_bonus': 6, 'features': ['Ability Score Improvement'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 1, 'spell_slots_8': 1, 'spell_slots_9': 1},
+            {'level': 20, 'proficiency_bonus': 6, 'features': ['Signature Spells'], 'cantrips_known': 5, 'spell_slots_1': 4, 'spell_slots_2': 3, 'spell_slots_3': 3, 'spell_slots_4': 3, 'spell_slots_5': 3, 'spell_slots_6': 2, 'spell_slots_7': 2, 'spell_slots_8': 1, 'spell_slots_9': 1},
+        ]
