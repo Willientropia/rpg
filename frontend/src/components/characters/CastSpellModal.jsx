@@ -1,7 +1,7 @@
 // src/components/characters/CastSpellModal.jsx
 import React, { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { charactersService } from '../../services/charactersService';
+import  charactersService  from '../../services/charactersService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
