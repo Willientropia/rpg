@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { charactersService, spellsService } from '../../services/charactersService';
+import charactersService  from '../../services/charactersService';
+import spellsService from '../../services/charactersService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';

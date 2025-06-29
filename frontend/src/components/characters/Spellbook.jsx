@@ -1,7 +1,7 @@
 // src/components/characters/Spellbook.jsx
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { spellsService } from '../../services/spellsService';
+import  spellsService  from '../../services/spellsService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
