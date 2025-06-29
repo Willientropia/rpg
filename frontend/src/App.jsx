@@ -8,6 +8,7 @@ import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 
+
 // Páginas principais
 import Dashboard from './pages/Dashboard';
 import CharacterList from './pages/characters/CharacterList';
@@ -53,16 +54,8 @@ function App() {
       <div className="App">
         <Routes>
           {/* Rotas públicas com AuthGuard para redirecionar se já autenticado */}
-          <Route path="/login" element={
-            <AuthGuard requireAuth={false}>
-              <LoginPage />
-            </AuthGuard>
-          } />
-          <Route path="/register" element={
-            <AuthGuard requireAuth={false}>
-              <RegisterPage />
-            </AuthGuard>
-          } />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Rotas protegidas */}
           <Route path="/" element={

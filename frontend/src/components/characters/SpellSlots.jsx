@@ -1,7 +1,7 @@
 // src/components/characters/SpellSlots.jsx
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { spellsService } from '../../services/spellsService';
+import { charactersService } from '../../services/charactersService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
@@ -112,7 +112,7 @@ export default function SpellSlots({ character, className = '' }) {
 
   // Mutation para usar espaço de feitiço
   const useSlotMutation = useMutation({
-    mutationFn: ({ level }) => spellsService.useSpellSlot(character.id, level),
+    mutationFn: ({ level }) => charactersService.useSpellSlot(character.id, level),
     onMutate: ({ level }) => {
       setLoadingSlot(level);
     },
@@ -126,7 +126,7 @@ export default function SpellSlots({ character, className = '' }) {
 
   // Mutation para recuperar espaços
   const recoverSlotsMutation = useMutation({
-    mutationFn: (restType) => spellsService.recoverSpellSlots(character.id, restType),
+    mutationFn: (restType) => charactersService.rest(character.id, restType),
     onSuccess: () => {
       queryClient.invalidateQueries(['character', character.id]);
     },

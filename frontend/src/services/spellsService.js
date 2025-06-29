@@ -1,5 +1,5 @@
-// src/services/spellsService.js
-import { api } from './api';
+// src/services/spellsService.js - Corrigido para usar a instância api correta
+import api from './api';
 
 export const spellsService = {
   // Buscar feitiços disponíveis para uma classe
@@ -10,7 +10,9 @@ export const spellsService = {
         params.append('level', level);
       }
       
-      const url = `/spells/class/${className.toLowerCase()}${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/characters/spells/for_class/?class=${className.toLowerCase()}${level ? `&level=${level}` : ''}`;
+      console.log('🔍 Buscando feitiços para classe:', url);
+      
       const response = await api.get(url);
       return response.data;
     } catch (error) {
@@ -22,7 +24,9 @@ export const spellsService = {
   // Buscar detalhes de um feitiço específico
   async getSpellDetails(spellSlug) {
     try {
-      const response = await api.get(`/spells/${spellSlug}/`);
+      console.log('📖 Buscando detalhes do feitiço:', spellSlug);
+      
+      const response = await api.get(`/characters/spells/detail/?slug=${spellSlug}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar detalhes do feitiço:', error);
@@ -54,7 +58,7 @@ export const spellsService = {
         params.append('concentration', filters.concentration);
       }
       
-      const response = await api.get(`/spells/?${params.toString()}`);
+      const response = await api.get(`/characters/spells/search/?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar feitiços:', error);
@@ -65,7 +69,7 @@ export const spellsService = {
   // Buscar escolas de magia
   async getSchools() {
     try {
-      const response = await api.get('/spells/schools/');
+      const response = await api.get('/characters/spells/schools/');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar escolas de magia:', error);
@@ -85,7 +89,7 @@ export const spellsService = {
   // Adicionar feitiço ao personagem
   async addSpellToCharacter(characterId, spellData) {
     try {
-      const response = await api.post(`/characters/${characterId}/spells/`, spellData);
+      const response = await api.post(`/characters/characters/${characterId}/add_spell/`, spellData);
       return response.data;
     } catch (error) {
       console.error('Erro ao adicionar feitiço ao personagem:', error);
@@ -96,7 +100,9 @@ export const spellsService = {
   // Remover feitiço do personagem
   async removeSpellFromCharacter(characterId, spellSlug) {
     try {
-      const response = await api.delete(`/characters/${characterId}/spells/${spellSlug}/`);
+      const response = await api.delete(`/characters/characters/${characterId}/remove_spell/`, {
+        data: { spell_slug: spellSlug }
+      });
       return response.data;
     } catch (error) {
       console.error('Erro ao remover feitiço do personagem:', error);
@@ -107,7 +113,7 @@ export const spellsService = {
   // Alternar status de preparação de feitiço
   async toggleSpellPrepared(characterId, spellId, isPrepared) {
     try {
-      const response = await api.patch(`/characters/${characterId}/spells/${spellId}/`, {
+      const response = await api.patch(`/characters/characters/${characterId}/spells/${spellId}/toggle_prepared/`, {
         is_prepared: isPrepared
       });
       return response.data;
@@ -120,7 +126,7 @@ export const spellsService = {
   // Buscar feitiços do personagem
   async getCharacterSpells(characterId) {
     try {
-      const response = await api.get(`/characters/${characterId}/spells/`);
+      const response = await api.get(`/characters/characters/${characterId}/spells/`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar feitiços do personagem:', error);
@@ -131,8 +137,8 @@ export const spellsService = {
   // Usar espaço de feitiço
   async useSpellSlot(characterId, level) {
     try {
-      const response = await api.post(`/characters/${characterId}/spell-slots/use/`, {
-        level: level
+      const response = await api.post(`/characters/characters/${characterId}/use_spell_slot/`, {
+        spell_level: level
       });
       return response.data;
     } catch (error) {
@@ -144,7 +150,7 @@ export const spellsService = {
   // Recuperar espaços de feitiço (descanso)
   async recoverSpellSlots(characterId, restType = 'long') {
     try {
-      const response = await api.post(`/characters/${characterId}/spell-slots/recover/`, {
+      const response = await api.post(`/characters/characters/${characterId}/rest/`, {
         rest_type: restType
       });
       return response.data;
@@ -157,7 +163,7 @@ export const spellsService = {
   // Buscar estatísticas de magia do personagem
   async getSpellcastingStats(characterId) {
     try {
-      const response = await api.get(`/characters/${characterId}/spellcasting-stats/`);
+      const response = await api.get(`/characters/characters/${characterId}/spellcasting_stats/`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de magia:', error);

@@ -1,4 +1,5 @@
 // src/services/charactersService.js - ACTIONS FUNCIONAIS CORRIGIDAS
+
 import api from './api';
 
 export const charactersService = {

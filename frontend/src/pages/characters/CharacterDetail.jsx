@@ -1,12 +1,12 @@
-// src/pages/characters/CharacterDetail.jsx - Versão com Sistema de Feitiços
+// src/pages/characters/CharacterDetail.jsx - Versão com Sistema de Feitiços CORRIGIDA
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersService } from '../../services/charactersService';
-import { spellsService } from '../../services/spellsService';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+// Imports corrigidos dos componentes de feitiços
 import SpellSlots from '../../components/characters/SpellSlots';
 import Spellbook from '../../components/characters/Spellbook';
 import CastSpellModal from '../../components/characters/CastSpellModal';
@@ -45,7 +45,7 @@ export default function CharacterDetail() {
 
   // Mutation para descanso
   const restMutation = useMutation({
-    mutationFn: (restType) => charactersService.recoverSpellSlots(id, restType),
+    mutationFn: (restType) => charactersService.rest(id, restType),
     onSuccess: () => {
       queryClient.invalidateQueries(['character', id]);
     },

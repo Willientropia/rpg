@@ -1,7 +1,7 @@
 // src/components/characters/CastSpellModal.jsx
 import React, { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { spellsService } from '../../services/spellsService';
+import { charactersService } from '../../services/charactersService';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
@@ -140,7 +140,7 @@ export default function CastSpellModal({
   // Mutation para conjurar feitiço
   const castSpellMutation = useMutation({
     mutationFn: ({ spellSlug, slotLevel, asRitual }) => {
-      return spellsService.useSpellSlot(character.id, asRitual ? 0 : slotLevel);
+      return charactersService.useSpellSlot(character.id, asRitual ? 0 : slotLevel);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['character', character.id]);
